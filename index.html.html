@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>ずけいをつくろう</title>
+<link href="https://fonts.googleapis.com/css2?family=Kosugi+Maru&display=swap" rel="stylesheet">
+<style>
+:root{--ink:#243b49;--paper:#fffdf7;--bg:#f9f7ef;--card:#fff;--soft:#f0f8f4;--line:#d8e5e1;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--ink:#e6eef2;--bg:#1d2a30;--card:#26363d;--soft:#2f4249}}
+*{box-sizing:border-box}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:'Kosugi Maru',sans-serif}
+main{max-width:1000px;margin:0 auto;padding:6px 12px 10px}
+h1{text-align:center;font-size:1.4rem;margin:0 0 2px}
+.sub{text-align:center;margin:0 0 8px;font-size:.9rem}
+.wrap{display:flex;flex-wrap:wrap;gap:16px;justify-content:center;align-items:flex-start}
+.frame{width:min(100%,calc(100vh - 110px),560px);width:min(100%,calc(100dvh - 110px),560px);padding:14px;background:var(--paper);border:3px solid #e3e9df;border-radius:26px;box-shadow:0 6px 0 #e5e9dc}
+.board{position:relative;width:100%;aspect-ratio:1}
+.board svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible;pointer-events:none}
+.pt{position:absolute;width:34px;height:34px;padding:0;border:0;border-radius:50%;background:transparent;transform:translate(-50%,-50%);cursor:pointer;display:grid;place-items:center;touch-action:manipulation}
+.pt::after{content:"";width:9px;height:9px;border-radius:50%;background:#8fb6ad;box-shadow:0 0 0 2px #fffdf7;transition:transform .15s}
+.pt:hover::after{transform:scale(1.6);background:#e66d45}
+.pt.cur::after{width:16px;height:16px;background:#f37d50;box-shadow:0 0 0 5px #ffe0c9}
+.pt.st:not(.cur)::after{background:#f37d50;width:13px;height:13px}
+.pt:disabled{cursor:default}
+aside{width:100%;max-width:310px}
+.card{background:var(--card);border-radius:22px;padding:12px 14px;box-shadow:0 2px 6px #0001}
+.card h2{margin:0 0 4px;font-size:1.05rem}
+.status{margin-top:8px;background:var(--soft);border-radius:14px;padding:8px 12px;font-weight:700;line-height:1.5}
+.hidden{display:none!important}
+.colors{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:10px}
+.cb{min-height:42px;border:3px solid transparent;border-radius:16px;font:inherit;font-weight:700;cursor:pointer;color:#243b49}
+.cb.sel{border-color:#243b49;box-shadow:0 0 0 3px #fff inset}
+.btn{display:block;width:100%;margin-top:8px;padding:10px;border:0;border-radius:16px;font:inherit;font-weight:700;font-size:1.05rem;cursor:pointer;color:#243b49}
+.copy{background:#ffd45d;box-shadow:0 5px 0 #d9b43d}
+.undo{background:#dcebe5;box-shadow:0 5px 0 #c7d9d2}
+.reset{background:#fbd9c6;box-shadow:0 5px 0 #d9b9a8}
+.dl{background:#cfe3f7;box-shadow:0 5px 0 #aac4de}
+.btn:active{transform:translateY(4px)}
+.btn:disabled{opacity:.6}
+</style>
+</head>
+<body>
+<main>
+<h1>ずけいを つくろう</h1>
+<p class="sub">てんを つないで、すきな かたちを つくってね</p>
+<div class="wrap">
+<section class="frame" aria-label="方眼紙">
+<div class="board" id="board">
+<svg viewBox="0 0 1000 1000" aria-hidden="true"><g id="grid"></g><polygon id="fill" fill="transparent"></polygon><polyline id="outline" fill="none" stroke="#284d59" stroke-width="11" stroke-linecap="round" stroke-linejoin="round"></polyline></svg>
+<div id="pts" style="position:absolute;inset:0"></div>
+</div>
+</section>
+<aside>
+<div class="card">
+<h2>やりかた</h2>
+<p style="margin:0;line-height:1.5">てんを じゅんばんに タッチして、さいしょの てんに もどると できあがり！</p>
+<div class="status" role="status" aria-live="polite" id="status">すきな てんを タッチしてね！</div>
+</div>
+<section id="palette" class="hidden" style="margin-top:10px">
+<h2 style="margin:0;font-size:1.15rem">ぬる いろ</h2>
+<div class="colors">
+<button class="cb" data-c="#f05353" style="background:#f05353">あか</button>
+<button class="cb" data-c="#4c90e8" style="background:#4c90e8">あお</button>
+<button class="cb" data-c="#ffd45d" style="background:#ffd45d">きいろ</button>
+<button class="cb" data-c="#68c898" style="background:#68c898">みどり</button>
+<button class="cb" data-c="#f9a65b" style="background:#f9a65b">オレンジ</button>
+</div>
+<button id="copy" class="btn copy">がぞうを コピーする</button>
+<button id="dl" class="btn dl hidden">がぞうを ほぞん する</button>
+</section>
+<button id="undo" class="btn undo hidden">ひとつ もどる</button>
+<button id="reset" class="btn reset">さいしょから</button>
+</aside>
+</div>
+</main>
+<script>
+const N=6,S=1000/N,NS='http://www.w3.org/2000/svg';
+const $=id=>document.getElementById(id);
+const status=$('status'),palette=$('palette'),fillEl=$('fill'),outEl=$('outline');
+let v=[],done=false,color=null;
+const btns=new Map();
+for(let n=0;n<=N;n++){for(const [a,b,c,d] of [[n*S,0,n*S,1000],[0,n*S,1000,n*S]]){const l=document.createElementNS(NS,'line');l.setAttribute('x1',a);l.setAttribute('y1',b);l.setAttribute('x2',c);l.setAttribute('y2',d);l.setAttribute('stroke','#d8e5e1');l.setAttribute('stroke-width',n===0||n===N?3:2);$('grid').appendChild(l);}}
+for(let y=0;y<=N;y++)for(let x=0;x<=N;x++){const b=document.createElement('button');b.type='button';b.className='pt';b.style.left=(x*100/N)+'%';b.style.top=(y*100/N)+'%';b.setAttribute('aria-label',`ひだりから${x+1}、うえから${y+1}の てん`);b.onclick=()=>pick(x,y);$('pts').appendChild(b);btns.set(x+','+y,b);}
+const same=(a,b)=>a.x===b.x&&a.y===b.y;
+const bt=(t,a,b)=>t>=Math.min(a,b)&&t<=Math.max(a,b);
+const ori=(a,b,c)=>{const t=(b.y-a.y)*(c.x-b.x)-(b.x-a.x)*(c.y-b.y);return t===0?0:t>0?1:2};
+const onS=(a,b,c)=>bt(b.x,a.x,c.x)&&bt(b.y,a.y,c.y);
+function inter(a,b,c,d){const o1=ori(a,b,c),o2=ori(a,b,d),o3=ori(c,d,a),o4=ori(c,d,b);if(o1!==o2&&o3!==o4)return true;return(o1===0&&onS(a,c,b))||(o2===0&&onS(a,d,b))||(o3===0&&onS(c,a,d))||(o4===0&&onS(c,b,d))}
+function area(l){let s=0;for(let i=0;i<l.length-1;i++)s+=l[i].x*l[i+1].y-l[i+1].x*l[i].y;return Math.abs(s)/2}
+function render(){
+const pts=v.map(p=>`${p.x*S},${p.y*S}`).join(' ');
+outEl.setAttribute('points',pts);
+fillEl.setAttribute('points',done?pts:'');
+btns.forEach(b=>{b.classList.remove('st','cur');b.disabled=done});
+$('undo').classList.toggle('hidden',!v.length||done);
+if(v.length&&!done){btns.get(v[0].x+','+v[0].y).classList.add('st');const l=v[v.length-1];btns.get(l.x+','+l.y).classList.add('cur')}
+}
+function pick(x,y){
+if(done)return;
+const n={x,y};
+if(!v.length){v.push(n);status.textContent='つぎの てんを えらんでね。たて・よこに つながるよ！';render();return}
+const last=v[v.length-1];
+if(same(last,n)){status.textContent='べつの てんを えらんでね。';return}
+if(last.x!==n.x&&last.y!==n.y&&(Math.abs(last.x-n.x)!==1||Math.abs(last.y-n.y)!==1)){status.textContent='ななめは 1マスだけ ひけるよ。ちかい てんを えらぼう！';return}
+const closing=same(n,v[0]);
+if(closing&&v.length<4){status.textContent='もうすこし せんを つないでから、はじめの てんに もどろう！';return}
+if(!closing&&v.some(p=>same(p,n))){status.textContent='とおった てんには もどれないよ。ほかの てんを えらぼう！';return}
+for(let i=0;i<v.length-1;i++){
+if(i===v.length-2)continue;
+if(closing&&i===0){
+if(inter(last,n,v[0],v[1])){
+const f=v[1];
+const ov=last.x===n.x&&v[0].x===f.x?last.x===v[0].x&&Math.max(Math.min(last.y,n.y),Math.min(v[0].y,f.y))<Math.min(Math.max(last.y,n.y),Math.max(v[0].y,f.y)):last.y===n.y&&v[0].y===f.y&&Math.max(Math.min(last.x,n.x),Math.min(v[0].x,f.x))<Math.min(Math.max(last.x,n.x),Math.max(v[0].x,f.x));
+if(ov){status.textContent='せんが かさならない てんを えらぼう！';return}
+}
+continue}
+if(inter(last,n,v[i],v[i+1])){status.textContent='せんが ぶつからない てんを えらぼう！';return}
+}
+if(closing&&area([...v,n])===0){status.textContent='なかに ひろさが ある かたちを つくろう！';return}
+v.push(n);
+if(closing){done=true;palette.classList.remove('hidden');status.textContent='できた！ すきな いろを えらんで ぬろう！'}
+else status.textContent='いいね！ つづけて つないで、さいしょの てんに もどろう。';
+render();
+}
+$('undo').onclick=()=>{if(!v.length||done)return;v.pop();status.textContent=v.length?'ひとつ もどったよ。つぎの てんを えらんでね。':'すきな てんを タッチしてね！';render()};
+document.querySelectorAll('.cb').forEach(b=>b.onclick=()=>{
+if(!done)return;
+color=b.dataset.c;fillEl.setAttribute('fill',color);
+document.querySelectorAll('.cb').forEach(x=>x.classList.toggle('sel',x===b));
+status.textContent='きれいに ぬれたね！ つぎは「がぞうを コピーする」を おしてね。';
+});
+$('reset').onclick=()=>{v=[];done=false;color=null;fillEl.setAttribute('fill','transparent');palette.classList.add('hidden');$('dl').classList.add('hidden');document.querySelectorAll('.cb').forEach(x=>x.classList.remove('sel'));status.textContent='すきな てんを タッチしてね！';render()};
+
+/* 画像づくり: 1000x1000の図を canvas に描いて PNG にする */
+function makePng(){
+return new Promise((res,rej)=>{
+try{
+const pad=30,c=document.createElement('canvas');c.width=c.height=1000+pad*2;
+const g=c.getContext('2d');
+g.fillStyle='#fffdf7';g.fillRect(0,0,c.width,c.height);
+g.translate(pad,pad);
+g.strokeStyle='#d8e5e1';
+for(let n=0;n<=N;n++){g.lineWidth=(n===0||n===N)?3:2;g.beginPath();g.moveTo(n*S,0);g.lineTo(n*S,1000);g.moveTo(0,n*S);g.lineTo(1000,n*S);g.stroke()}
+g.beginPath();v.forEach((p,i)=>i?g.lineTo(p.x*S,p.y*S):g.moveTo(p.x*S,p.y*S));
+if(color){g.fillStyle=color;g.fill()}
+g.strokeStyle='#284d59';g.lineWidth=11;g.lineCap='round';g.lineJoin='round';g.stroke();
+c.toBlob(b=>b?res(b):rej(new Error('toBlob')),'image/png');
+}catch(e){rej(e)}
+});
+}
+$('copy').onclick=async()=>{
+if(!done)return;
+const b=$('copy');b.disabled=true;
+try{
+if(!navigator.clipboard||!window.ClipboardItem)throw new Error('unsupported');
+/* クリックの直後に write を呼び、画像は Promise で渡す(ブラウザの許可ルール対策) */
+await navigator.clipboard.write([new ClipboardItem({'image/png':makePng()})]);
+status.textContent='コピーできたよ！ ロイロノートを ひらいて、キーボードの Ctrl を おしながら V を おしてね。';
+}catch(e){
+$('dl').classList.remove('hidden');
+status.textContent='ごめんね、コピーが できなかったよ。「がぞうを ほぞん する」を おしてね。（先生へ: '+(e&&e.name||'Error')+'）';
+}finally{b.disabled=false}
+};
+$('dl').onclick=async()=>{
+try{const blob=await makePng();const u=URL.createObjectURL(blob);const a=document.createElement('a');a.href=u;a.download='katachi.png';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),2000);status.textContent='ほぞん したよ。'}
+catch(e){status.textContent='ほぞんも できなかったよ。先生に つたえてね。'}
+};
+render();
+</script>
+</body>
+</html>
